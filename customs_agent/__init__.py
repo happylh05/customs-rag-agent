@@ -1,0 +1,2 @@
+"""Customs declaration RAG assistant."""
+

@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>报关单智能检索助手</title><link rel="stylesheet" href="/static/style.css"><link rel="stylesheet" href="/static/analytics.css">
+</head>
+<body>
+  <main>
+    <header><div><span class="eyebrow">CUSTOMS RAG</span><h1>报关单智能检索助手</h1><p>上传、归档、分类，并且只依据报关单原文回答。</p><a class="analytics-link" href="/analytics">查看数据分析 →</a></div><span id="status" class="badge">检查中</span></header>
+    <section class="grid">
+      <article class="card upload"><h2>01 / 批量文件入库</h2><label id="drop"><input id="file" type="file" multiple accept=".pdf,.docx,.txt,.md"><b>选择或拖入多份报关单</b><small>PDF · Word · TXT · 单个文件最大 25 MB</small></label><button id="upload">批量解析并写入知识库</button><div id="uploadResult" class="result muted">尚未选择文件</div></article>
+      <article class="card"><h2>02 / 数据问答</h2><textarea id="question" placeholder="例如：海关编号 123 对应的境内收货人是谁？"></textarea><button id="ask">从知识库查询</button><div id="answer" class="result muted">答案和原文证据将在这里显示</div><div id="sources"></div></article>
+    </section>
+    <section class="card library"><div class="row"><h2>已入库报关单</h2><button class="ghost" id="refresh">刷新</button></div><div id="documents" class="documents"></div></section>
+  </main><script src="/static/app.js"></script>
+</body></html>
