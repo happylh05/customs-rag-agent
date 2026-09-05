@@ -32,3 +32,15 @@ uvicorn app:app --reload
 ```bash
 pytest -q
 ```
+
+## Docker 部署
+
+复制环境变量模板并填写服务端密钥：
+
+```bash
+cp .env.example .env
+docker compose up -d --build
+docker compose ps
+```
+
+Compose 默认只把应用绑定到服务器的 `127.0.0.1:8000`，不会直接暴露到公网。正式共享前需在前方配置 HTTPS、登录鉴权和访问控制，切勿直接开放公网 8000 端口。
