@@ -44,3 +44,39 @@ docker compose ps
 ```
 
 Compose 默认只把应用绑定到服务器的 `127.0.0.1:8000`，不会直接暴露到公网。正式共享前需在前方配置 HTTPS、登录鉴权和访问控制，切勿直接开放公网 8000 端口。
+
+## 独立公网登录版
+
+公网版使用独立入口 `app_public.py`、独立容器和独立数据目录，不会改变上面的 Tailscale/本机版。先在服务器创建 `.env.public`：
+
+```bash
+python3 scripts/hash_password.py
+openssl rand -hex 32
+nano .env.public
+```
+
+将前两条命令的结果分别写入以下配置。密码哈希和会话密钥不得提交到 Git：
+
+```dotenv
+PUBLIC_AUTH_USERNAME=你的登录账号
+PUBLIC_AUTH_PASSWORD_HASH=密码生成器输出的整行内容
+PUBLIC_SESSION_SECRET=openssl生成的随机内容
+PUBLIC_SESSION_HOURS=12
+MAX_UPLOAD_MB=25
+
+# 沿用现有模型服务时，在服务器中安全填写；不要发送到聊天或提交到 Git。
+LLM_API_KEY=
+LLM_BASE_URL=https://api.agicto.cn/v1
+LLM_MODEL=gpt-5.6-luna
+LLM_API_MODE=chat_completions
+```
+
+启动并检查：
+
+```bash
+sudo docker compose -f compose.public.yaml up -d --build
+sudo docker compose -f compose.public.yaml ps
+curl http://127.0.0.1:8001/api/health
+```
+
+公网容器只监听 `127.0.0.1:8001`。必须通过 Caddy 或 Nginx 提供 HTTPS，不能直接在腾讯云安全组开放 8001。`Caddyfile.public.example` 是反向代理模板；把其中域名替换为已解析到服务器公网 IP 的域名后再启用。登录 Cookie 仅允许通过 HTTPS 发送。
