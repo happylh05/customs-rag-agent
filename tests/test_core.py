@@ -147,3 +147,26 @@ def test_search_prefers_structured_evidence_and_one_chunk_per_document(tmp_path)
     rows = store.search("ABC123456", limit=4)
     assert len(rows) == 2
     assert len({row["document_id"] for row in rows}) == 2
+
+
+def test_deal_method_value_returns_unique_companies(tmp_path):
+    store = Store(tmp_path / "deal-method.db")
+    store.add("a.pdf", "a.pdf", "a", 1, {
+        "境内发货人": "甲公司", "成交方式": "FOB",
+    }, ["成交方式 FOB"])
+    store.add("b.pdf", "b.pdf", "b", 1, {
+        "境内发货人": "甲公司", "成交方式": "FOB",
+    }, ["成交方式 FOB"])
+    store.add("c.pdf", "c.pdf", "c", 1, {
+        "境内发货人": "乙公司", "成交方式": "C&F",
+    }, ["成交方式 C&F"])
+
+    method, companies = store.companies_by_deal_method("FOB")
+    assert method == "FOB"
+    assert len(companies) == 1
+    assert companies[0]["company"] == "甲公司"
+    assert companies[0]["documents"] == 2
+    assert {source["filename"] for source in companies[0]["sources"]} == {"a.pdf", "b.pdf"}
+    method, companies = store.companies_by_deal_method("C&F有哪些公司")
+    assert method == "C&F"
+    assert companies[0]["company"] == "乙公司"

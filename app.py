@@ -115,6 +115,20 @@ def upload(file: UploadFile = File(...)):
 
 @app.post("/api/ask")
 def ask(payload: Question):
+    deal_method, companies = store.companies_by_deal_method(payload.question)
+    if deal_method:
+        if not companies:
+            return {
+                "answer": f"未找到成交方式为 {deal_method} 的公司。",
+                "mode": "structured-deal-method-none", "sources": [],
+            }
+        response_text = f"成交方式为 {deal_method} 的公司：\n" + "\n".join(
+            f"{index}. {item['company']}（{item['documents']} 份报关单）"
+            for index, item in enumerate(companies, 1)
+        )
+        sources = [source for item in companies for source in item["sources"]][:20]
+        return {"answer": response_text, "mode": "structured-deal-method-companies", "sources": sources}
+
     if any(phrase in payload.question for phrase in ("全部数据", "所有数据", "完整数据", "全部字段", "所有字段")):
         documents = store.list_documents()
         if not documents:

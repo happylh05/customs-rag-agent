@@ -153,6 +153,41 @@ class Store:
         # Only narrow the search when the question supplied a usable discriminator.
         return scoped if (company_candidates or identifiers) else documents
 
+    def companies_by_deal_method(self, question: str):
+        """Return companies when the question is a deal-method value such as FOB or C&F."""
+        normalized_question = re.sub(r"[^A-Z&]", "", question.upper().replace("＆", "&"))
+        allowed = {"FOB", "C&F", "CIF", "CFR", "EXW", "FCA", "CPT", "CIP", "DAP", "DPU", "DDP"}
+        requested = next(
+            (value for value in allowed if normalized_question == value or (
+                value in normalized_question and any(word in question for word in ("成交", "公司", "企业", "哪些"))
+            )),
+            None,
+        )
+        if not requested:
+            return None, []
+
+        aliases = {"CNF": "C&F"}
+        requested = aliases.get(requested, requested)
+        companies = {}
+        for document in self.list_documents():
+            raw_method = str(document["fields"].get("成交方式", ""))
+            method = re.sub(r"[^A-Z&]", "", raw_method.upper().replace("＆", "&"))
+            method = aliases.get(method, method)
+            if method != requested:
+                continue
+            fields = document["fields"]
+            company = (
+                fields.get("境内发货人") or fields.get("境内收发货人")
+                or fields.get("生产销售单位") or "未识别企业"
+            )
+            record = companies.setdefault(company, {"company": company, "documents": 0, "sources": []})
+            record["documents"] += 1
+            record["sources"].append({
+                "document_id": document["id"], "filename": document["filename"],
+                "chunk_index": -1, "excerpt": f"成交方式：{raw_method}；境内发货人：{company}",
+            })
+        return requested, sorted(companies.values(), key=lambda item: (-item["documents"], item["company"]))
+
     def search(self, query: str, limit: int = 5):
         tokens = re.findall(r"[\w\u4e00-\u9fff]+", query.lower())
         # Chinese FTS tokenization often keeps long sequences intact. OR plus LIKE fallback improves recall.
