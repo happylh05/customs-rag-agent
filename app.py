@@ -2,6 +2,7 @@ import hashlib
 import os
 import re
 import time
+from collections import Counter
 from pathlib import Path
 from uuid import uuid4
 
@@ -140,7 +141,12 @@ def ask(payload: Question):
                 "mode": "structured-none", "sources": [],
             }
         unique_values = list(dict.fromkeys(item["value"] for item in matches))
-        if len(unique_values) == 1:
+        if field_name in {"成交方式", "运输方式", "最终目的国（地区）"} and len(matches) > 10:
+            counts = Counter(item["value"] for item in matches)
+            response_text = "\n".join(
+                f"{value}：{count} 份" for value, count in counts.most_common()
+            )
+        elif len(unique_values) == 1:
             response_text = unique_values[0]
         else:
             response_text = "\n".join(f"{item['filename']}：{item['value']}" for item in matches)
@@ -149,7 +155,7 @@ def ask(payload: Question):
             "sources": [{
                 "document_id": item["document_id"], "filename": item["filename"],
                 "chunk_index": -1, "excerpt": f"{item['field']}：{item['value']}",
-            } for item in matches],
+            } for item in matches[:20]],
         }
     cache_key = re.sub(r"\s+", "", payload.question).lower()
     cached = answer_cache.get(cache_key)

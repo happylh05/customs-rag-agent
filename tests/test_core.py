@@ -39,11 +39,13 @@ def test_structured_field_lookup(tmp_path):
         "出境关别": "南沙新港",
         "运输工具名称及航次号": "赋力898/000260424003",
         "商品编号": "8711202000",
+        "成交方式": "FOB",
     }
     store.add("sample.pdf", "sample.pdf", "hash", 1, fields, ["sample"])
     for question, field in [
         ("境内发货人是谁", "境内发货人"), ("出境关别", "出境关别"),
         ("运输工具名称及航次号", "运输工具名称及航次号"), ("商品编号", "商品编号"),
+        ("成交方式是什么", "成交方式"),
     ]:
         matched, rows = store.find_structured_field(question)
         assert matched == field
