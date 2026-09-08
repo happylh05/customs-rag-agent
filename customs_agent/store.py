@@ -11,8 +11,10 @@ class Store:
         self.init()
 
     def connect(self):
-        conn = sqlite3.connect(self.path)
+        conn = sqlite3.connect(self.path, timeout=10)
         conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA synchronous=NORMAL")
         return conn
 
     def init(self):
@@ -162,7 +164,7 @@ class Store:
                         SELECT c.content, c.document_id, c.chunk_index, d.filename, bm25(chunks) score
                         FROM chunks c JOIN documents d ON d.id=c.document_id
                         WHERE chunks MATCH ? ORDER BY score LIMIT ?
-                    """, (fts_query, limit)).fetchall()
+                    """, (fts_query, limit * 4)).fetchall()
                 except sqlite3.OperationalError:
                     rows = []
             if not rows and tokens:
@@ -171,5 +173,29 @@ class Store:
                     SELECT c.content, c.document_id, c.chunk_index, d.filename, 0 score
                     FROM chunks c JOIN documents d ON d.id=c.document_id
                     WHERE {clauses} LIMIT ?
-                """, (*[f"%{t}%" for t in tokens[:8]], limit)).fetchall()
-        return [dict(row) for row in rows]
+                """, (*[f"%{t}%" for t in tokens[:8]], limit * 4)).fetchall()
+        candidates = [dict(row) for row in rows]
+
+        def quality(item):
+            content = item["content"]
+            replacement = content.count("�")
+            controls = sum(not ch.isprintable() and not ch.isspace() for ch in content)
+            unusual = sum(
+                not (ch.isalnum() or ch.isspace() or "\u4e00" <= ch <= "\u9fff" or ch in "，。；：、（）()[]【】{}<>《》+-_./,%$￥'\"!?：")
+                for ch in content
+            )
+            readable = 1 - min(1, (replacement * 8 + controls * 8 + unusual) / max(len(content), 1))
+            structured_bonus = 0.35 if "[结构化字段]" in content else 0
+            return readable + structured_bonus
+
+        candidates.sort(key=quality, reverse=True)
+        selected = []
+        seen_documents = set()
+        for item in candidates:
+            if quality(item) < 0.72 or item["document_id"] in seen_documents:
+                continue
+            selected.append(item)
+            seen_documents.add(item["document_id"])
+            if len(selected) >= limit:
+                break
+        return selected

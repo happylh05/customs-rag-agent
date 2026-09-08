@@ -1,6 +1,7 @@
 import hashlib
 import os
 import re
+import time
 from pathlib import Path
 from uuid import uuid4
 
@@ -21,6 +22,7 @@ load_dotenv(BASE / ".env")
 UPLOADS = BASE / "data" / "uploads"
 UPLOADS.mkdir(parents=True, exist_ok=True)
 store = Store(BASE / "data" / "customs.db")
+answer_cache: dict[str, tuple[float, dict]] = {}
 app = FastAPI(title="报关单智能检索助手", version="1.0.0")
 app.mount("/static", StaticFiles(directory=BASE / "static"), name="static")
 
@@ -88,6 +90,7 @@ def upload(file: UploadFile = File(...)):
             fields = classify(text)
             values = chunks(text)
             store.reindex(existing["id"], pages, fields, values)
+            answer_cache.clear()
         except ExtractionError as exc:
             raise HTTPException(422, str(exc)) from exc
         return {
@@ -99,6 +102,7 @@ def upload(file: UploadFile = File(...)):
         fields = classify(text)
         values = chunks(text)
         doc_id = store.add(file.filename or target.name, target.name, sha, pages, fields, values)
+        answer_cache.clear()
     except ExtractionError as exc:
         target.unlink(missing_ok=True)
         raise HTTPException(422, str(exc)) from exc
@@ -147,13 +151,18 @@ def ask(payload: Question):
                 "chunk_index": -1, "excerpt": f"{item['field']}：{item['value']}",
             } for item in matches],
         }
-    evidence = store.search(payload.question, limit=6)
-    try:
-        text, mode = answer(payload.question, evidence)
-    except Exception as exc:
-        raise HTTPException(502, f"模型服务暂时不可用：{exc}") from exc
+    cache_key = re.sub(r"\s+", "", payload.question).lower()
+    cached = answer_cache.get(cache_key)
+    if cached and cached[0] > time.time():
+        return {**cached[1], "cached": True}
+    evidence = store.search(payload.question, limit=4)
+    text, mode = answer(payload.question, evidence)
     sources = [{
         "document_id": item["document_id"], "filename": item["filename"],
         "chunk_index": item["chunk_index"], "excerpt": item["content"][:600]
     } for item in evidence]
-    return {"answer": text, "mode": mode, "sources": sources}
+    result = {"answer": text, "mode": mode, "sources": sources}
+    if len(answer_cache) >= 200:
+        answer_cache.clear()
+    answer_cache[cache_key] = (time.time() + 300, result)
+    return result

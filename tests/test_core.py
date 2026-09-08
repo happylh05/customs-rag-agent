@@ -129,3 +129,15 @@ def test_classifier_extracts_deal_method_and_final_destination():
     fields = classify("成交方式：FOB\n最终目的国（地区）：肯尼亚")
     assert fields["成交方式"] == "FOB"
     assert fields["最终目的国（地区）"] == "肯尼亚"
+
+
+def test_search_prefers_structured_evidence_and_one_chunk_per_document(tmp_path):
+    store = Store(tmp_path / "quality.db")
+    store.add("a.pdf", "a.pdf", "a", 1, {}, [
+        "目标编号 ABC123456 正常原文证据",
+        "目标编号 ABC123456 SabeYGYj0Wue-Wfy ¦q6g(bX Å pu(IWWr¶,v}",
+    ])
+    store.add("b.pdf", "b.pdf", "b", 1, {}, ["目标编号 ABC123456 第二份正常证据"])
+    rows = store.search("ABC123456", limit=4)
+    assert len(rows) == 2
+    assert len({row["document_id"] for row in rows}) == 2
