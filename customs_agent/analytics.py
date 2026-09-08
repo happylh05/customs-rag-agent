@@ -59,7 +59,6 @@ def build_analytics(documents: list[dict]) -> dict:
         destination = fields.get("运抵国（地区）") or fields.get("最终目的国（地区）") or "未识别"
         final_destination = fields.get("最终目的国（地区）") or "未识别"
         destination_stats[destination]["documents"] += 1
-        final_destination_stats[final_destination]["documents"] += 1
         transport_stats[fields.get("运输方式", "未识别")] += 1
         deal_method_stats[fields.get("成交方式", "未识别")] += 1
         date = fields.get("出口日期") or fields.get("进口日期") or fields.get("申报日期")
@@ -73,6 +72,7 @@ def build_analytics(documents: list[dict]) -> dict:
             (int(match.group(1)), key) for key in fields
             if (match := re.fullmatch(r"商品(\d+)-项号", key))
         )
+        document_final_destinations = set()
         for item_index, _ in item_numbers:
             prefix = f"商品{item_index}-"
             hs = fields.get(prefix + "商品编号", "未识别")
@@ -83,13 +83,19 @@ def build_analytics(documents: list[dict]) -> dict:
             company_stats[company]["items"] += 1
             company_stats[company]["amounts"][currency] += amount
             destination_stats[destination]["items"] += 1
-            final_destination_stats[final_destination]["items"] += 1
+            item_final_destination = fields.get(prefix + "最终目的国（地区）") or final_destination
+            final_destination_stats[item_final_destination]["items"] += 1
+            document_final_destinations.add(item_final_destination)
             product_stats[hs]["name"].add(name)
             product_stats[hs]["items"] += 1
             product_stats[hs]["companies"].add(company)
             if quantity != "未识别": product_stats[hs]["quantity_text"].append(quantity)
             product_stats[hs]["amounts"][currency] += amount
             currency_totals[currency] += amount
+        if not document_final_destinations:
+            document_final_destinations.add(final_destination)
+        for value in document_final_destinations:
+            final_destination_stats[value]["documents"] += 1
 
     def amount_text(amounts):
         return "；".join(f"{currency} {value:,.2f}" for currency, value in sorted(amounts.items())) or "未识别"

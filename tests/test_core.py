@@ -118,13 +118,17 @@ def test_analytics_separates_currencies_and_counts_items():
         "商品1-数量及单位": "10千克", "商品1-单价/总价/币制": "1.00 10.00 美元",
         "商品2-项号": "2", "商品2-商品编号": "8208300000", "商品2-商品名称": "刀具",
         "商品2-数量及单位": "2个", "商品2-单价/总价/币制": "5.00 10.00 人民币",
+        "商品2-最终目的国（地区）": "坦桑尼亚",
     }}]
     result = build_analytics(documents)
     assert result["overview"]["items"] == 2
     assert result["overview"]["weight_difference_kg"] == 10
     assert {row["currency"] for row in result["currency_totals"]} == {"美元", "人民币"}
     assert result["deal_methods"] == [{"name": "FOB", "documents": 1}]
-    assert result["final_destinations"] == [{"name": "肯尼亚", "documents": 1, "items": 2}]
+    assert result["final_destinations"] == [
+        {"name": "肯尼亚", "documents": 1, "items": 1},
+        {"name": "坦桑尼亚", "documents": 1, "items": 1},
+    ]
 
 
 def test_classifier_extracts_deal_method_and_final_destination():
