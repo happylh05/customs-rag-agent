@@ -30,7 +30,9 @@ def build_analytics(documents: list[dict]) -> dict:
     company_stats = defaultdict(lambda: {"documents": 0, "items": 0, "gross_weight": Decimal(0), "net_weight": Decimal(0), "amounts": defaultdict(Decimal)})
     customs_stats = defaultdict(int)
     destination_stats = defaultdict(lambda: {"documents": 0, "items": 0})
+    final_destination_stats = defaultdict(lambda: {"documents": 0, "items": 0})
     transport_stats = defaultdict(int)
+    deal_method_stats = defaultdict(int)
     product_stats = defaultdict(lambda: {"name": set(), "items": 0, "quantity_text": [], "amounts": defaultdict(Decimal), "companies": set()})
     currency_totals = defaultdict(Decimal)
     total_items = 0
@@ -39,7 +41,7 @@ def build_analytics(documents: list[dict]) -> dict:
     total_packages = Decimal(0)
     dates = []
     complete = defaultdict(int)
-    important_fields = ["境内发货人", "海关编号", "出境关别", "出口日期", "运输方式", "运抵国（地区）", "毛重（千克）", "净重（千克）"]
+    important_fields = ["境内发货人", "海关编号", "出境关别", "出口日期", "运输方式", "成交方式", "运抵国（地区）", "最终目的国（地区）", "毛重（千克）", "净重（千克）"]
 
     for document in documents:
         fields = document["fields"]
@@ -55,8 +57,11 @@ def build_analytics(documents: list[dict]) -> dict:
         company_stats[company]["net_weight"] += net
         customs_stats[fields.get("出境关别", "未识别")] += 1
         destination = fields.get("运抵国（地区）") or fields.get("最终目的国（地区）") or "未识别"
+        final_destination = fields.get("最终目的国（地区）") or "未识别"
         destination_stats[destination]["documents"] += 1
+        final_destination_stats[final_destination]["documents"] += 1
         transport_stats[fields.get("运输方式", "未识别")] += 1
+        deal_method_stats[fields.get("成交方式", "未识别")] += 1
         date = fields.get("出口日期") or fields.get("进口日期") or fields.get("申报日期")
         if date and re.fullmatch(r"\d{8}", str(date)):
             dates.append(str(date))
@@ -78,6 +83,7 @@ def build_analytics(documents: list[dict]) -> dict:
             company_stats[company]["items"] += 1
             company_stats[company]["amounts"][currency] += amount
             destination_stats[destination]["items"] += 1
+            final_destination_stats[final_destination]["items"] += 1
             product_stats[hs]["name"].add(name)
             product_stats[hs]["items"] += 1
             product_stats[hs]["companies"].add(company)
@@ -109,7 +115,9 @@ def build_analytics(documents: list[dict]) -> dict:
         } for k, v in sorted(company_stats.items(), key=lambda x: (-x[1]["documents"], x[0]))],
         "customs_offices": [{"name": k, "documents": v} for k, v in sorted(customs_stats.items(), key=lambda x: -x[1])],
         "destinations": [{"name": k, **v} for k, v in sorted(destination_stats.items(), key=lambda x: -x[1]["documents"])],
+        "final_destinations": [{"name": k, **v} for k, v in sorted(final_destination_stats.items(), key=lambda x: -x[1]["documents"])],
         "transports": [{"name": k, "documents": v} for k, v in sorted(transport_stats.items(), key=lambda x: -x[1])],
+        "deal_methods": [{"name": k, "documents": v} for k, v in sorted(deal_method_stats.items(), key=lambda x: -x[1])],
         "products": [{
             "hs_code": k, "names": "；".join(sorted(v["name"])), "items": v["items"],
             "companies": len(v["companies"]), "amount": amount_text(v["amounts"]),
@@ -120,4 +128,3 @@ def build_analytics(documents: list[dict]) -> dict:
             "rate": round(complete[field] / count * 100, 1) if count else 0,
         } for field in important_fields],
     }
-

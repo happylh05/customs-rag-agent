@@ -110,6 +110,7 @@ def test_analytics_separates_currencies_and_counts_items():
     documents = [{"fields": {
         "境内发货人": "甲公司", "海关编号": "1", "出境关别": "南沙新港",
         "出口日期": "20260101", "运输方式": "水路运输", "运抵国（地区）": "埃及",
+        "成交方式": "FOB", "最终目的国（地区）": "肯尼亚",
         "毛重（千克）": "100", "净重（千克）": "90", "件数": "2",
         "商品1-项号": "1", "商品1-商品编号": "8509900000", "商品1-商品名称": "配件",
         "商品1-数量及单位": "10千克", "商品1-单价/总价/币制": "1.00 10.00 美元",
@@ -120,3 +121,11 @@ def test_analytics_separates_currencies_and_counts_items():
     assert result["overview"]["items"] == 2
     assert result["overview"]["weight_difference_kg"] == 10
     assert {row["currency"] for row in result["currency_totals"]} == {"美元", "人民币"}
+    assert result["deal_methods"] == [{"name": "FOB", "documents": 1}]
+    assert result["final_destinations"] == [{"name": "肯尼亚", "documents": 1, "items": 2}]
+
+
+def test_classifier_extracts_deal_method_and_final_destination():
+    fields = classify("成交方式：FOB\n最终目的国（地区）：肯尼亚")
+    assert fields["成交方式"] == "FOB"
+    assert fields["最终目的国（地区）"] == "肯尼亚"
